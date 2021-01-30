@@ -1,7 +1,7 @@
 // example declaration file - remove these and add your own custom typings
 
 // memory extension samples
-export enum CreepRole {
+export enum creepRole {
   HARVESTER = "HARVESTER",
   UPGRADER = "UPGRADER",
   BUILDER = "BUILDER",
@@ -9,7 +9,7 @@ export enum CreepRole {
 }
 
 export type CreepsByRole = {
-  [P in keyof typeof CreepRole]: CustomCreep[];
+  [P in keyof typeof creepRole]: CustomCreep[];
 };
 
 export interface CustomCreep extends Creep {
@@ -17,7 +17,7 @@ export interface CustomCreep extends Creep {
 }
 
 export interface CreepMemory {
-  role: CreepRole;
+  role: creepRole;
   room: string;
 }
 
@@ -46,16 +46,4 @@ export interface UpgraderState extends CreepMemory {
   isUnloading: boolean;
   sourceId?: Id<Source>;
   controllerId?: Id<StructureController>;
-}
-
-interface Memory {
-  uuid: number;
-  log: any;
-}
-
-// `global` extension samples
-declare namespace NodeJS {
-  interface Global {
-    log: any;
-  }
 }
