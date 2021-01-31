@@ -27,7 +27,7 @@ export interface HarvesterState extends CreepMemory {
   isHarvesting: boolean;
   isUnloading: boolean;
   sourceId?: Id<Source>;
-  destinationId?: Id<AnyStructure>;
+  destinationId?: Id<StructureExtension | StructureSpawn>;
 }
 
 export interface BuilderState extends CreepMemory {
