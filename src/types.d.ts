@@ -5,15 +5,10 @@ interface Memory {
   log: any;
 }
 
-// interface RoomMemory {
-//   sources: {
-//     id: string;
-//     workerCount: number;
-//   }[];
-// }
 interface RoomMemory {
   // sources: Record<Id<Source>, { workerCount: number }>;
-  sources: Record<string, { workerCount: number }>;
+  // sources: Record<string, { workerCount: number }>;
+  sources: Record<string, { harvesters: Id<Creep>[] }>;
 }
 
 // `global` extension samples

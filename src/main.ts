@@ -13,6 +13,7 @@ function init() {
   // this state will be updated by creeps that are using that source
   // so that consumers (harvesters, upgraders, builders) are spread evenly
 
+  console.log("init");
   // loop through all controlled/owned rooms and set energy sources in
   // their memory, so i can track how many creeps are mining a source
   // and redirect them accordingly. because init code also runes on every
@@ -23,8 +24,9 @@ function init() {
     if (!room.memory.sources) {
       room.memory.sources = {};
       for (const source of sources) {
+        console.log("pushing source to room memory");
         room.memory.sources[source.id] = {
-          workerCount: 0
+          harvesters: []
         };
       }
     }
@@ -75,7 +77,8 @@ function runSpawn(spawn: StructureSpawn) {
 
   const isSpawning = spawn.spawning;
 
-  if (isSpawning || availableEnergy < maxEnergy) {
+  // set to 400, cause thats the current price of screep
+  if (isSpawning || availableEnergy < 500) {
     // just nope the fuck out and don't do any further calculations
     return;
   }
@@ -97,7 +100,7 @@ function runSpawn(spawn: StructureSpawn) {
 
   // spawn harvesters
   if (creepsByRole.HARVESTER.length < 2) {
-    return spawnHarvester(spawn);
+    return spawnHarvester(spawn, availableEnergy);
   }
 
   // spawn upgraders
@@ -106,11 +109,11 @@ function runSpawn(spawn: StructureSpawn) {
   }
 
   if (creepsByRole.BUILDER.length < 2) {
-    return spawnBuilder(spawn);
+    return spawnBuilder(spawn, availableEnergy);
   }
 
   // if (creepsByRole.REPAIRER.length === 0) {
-  //   return spawnRepairer(spawn);
+  //   return spawnRepairer(spawn, availableEnergy);
   // }
 }
 
@@ -119,39 +122,67 @@ function runSpawn(spawn: StructureSpawn) {
  * - which parts
  * - initial state
  */
-function spawnHarvester(spawn: StructureSpawn) {
-  spawn.spawnCreep([WORK, CARRY, MOVE], generateCreepName(creepRole.HARVESTER), {
+function spawnHarvester(spawn: StructureSpawn, energy: number) {
+  // const body: BodyPartConstant[] = [];
+  const body: BodyPartConstant[] = [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+
+  // let maxEnergy = energy;
+  // let maxBodyParts = 50;
+  // while (maxBodyParts >= 4 && maxEnergy >= 300) {
+  //   body.push(WORK);
+  //   body.push(WORK);
+  //   body.push(CARRY);
+  //   body.push(MOVE);
+  //   maxBodyParts -= 4;
+  //   maxEnergy -= 300;
+  // }
+  spawn.spawnCreep(body, generateCreepName(creepRole.HARVESTER), {
     memory: { role: creepRole.HARVESTER, room: spawn.room.name, isEmpty: true }
   });
 }
 
 function spawnUpgrader(spawn: StructureSpawn, energy: number) {
-  const body: BodyPartConstant[] = [];
+  // const body: BodyPartConstant[] = [];
+  const body: BodyPartConstant[] = [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
 
-  let maxEnergy = energy;
-  let maxBodyParts = 50;
-  while (maxBodyParts >= 4 && maxEnergy >= 300) {
-    body.push(WORK);
-    body.push(WORK);
-    body.push(CARRY);
-    body.push(MOVE);
-    maxBodyParts -= 4;
-    maxEnergy -= 300;
-  }
+  // let maxEnergy = energy;
+  // let maxBodyParts = 50;
+  // while (maxBodyParts >= 4 && maxEnergy >= 300) {
+  //   body.push(WORK);
+  //   body.push(WORK);
+  //   body.push(CARRY);
+  //   body.push(MOVE);
+  //   maxBodyParts -= 4;
+  //   maxEnergy -= 300;
+  // }
 
   spawn.spawnCreep(body, generateCreepName(creepRole.UPGRADER), {
     memory: { role: creepRole.UPGRADER, room: spawn.room.name, isEmpty: true }
   });
 }
 
-function spawnBuilder(spawn: StructureSpawn) {
-  spawn.spawnCreep([WORK, CARRY, MOVE], generateCreepName(creepRole.BUILDER), {
+function spawnBuilder(spawn: StructureSpawn, energy: number) {
+  const body: BodyPartConstant[] = [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+
+  // let maxEnergy = energy;
+  // let maxBodyParts = 50;
+  // while (maxBodyParts >= 4 && maxEnergy >= 300) {
+  //   body.push(WORK);
+  //   body.push(WORK);
+  //   body.push(CARRY);
+  //   body.push(MOVE);
+  //   maxBodyParts -= 4;
+  //   maxEnergy -= 300;
+  // }
+
+  spawn.spawnCreep(body, generateCreepName(creepRole.BUILDER), {
     memory: { role: creepRole.BUILDER, room: spawn.room.name, isEmpty: true }
   });
 }
 
 function spawnRepairer(spawn: StructureSpawn) {
-  spawn.spawnCreep([WORK, CARRY, MOVE], generateCreepName(creepRole.REPAIRER), {
+  const body: BodyPartConstant[] = [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+  spawn.spawnCreep(body, generateCreepName(creepRole.REPAIRER), {
     memory: { role: creepRole.REPAIRER, room: spawn.room.name, isEmpty: true }
   });
 }
@@ -199,7 +230,11 @@ function runHarvester(creep: Creep) {
       const destination = Game.getObjectById(state.destinationId);
       if (destination) {
         const transferResponse = creep.transfer(destination, RESOURCE_ENERGY);
-        if (transferResponse !== OK) state.destinationId = findSpawnOrExtensionId(creep);
+        if (transferResponse === ERR_FULL) {
+          state.destinationId = findSpawnOrExtensionId(creep);
+        } else if (transferResponse === ERR_NOT_IN_RANGE) {          
+          creep.moveTo(destination, { visualizePathStyle: { stroke: "#ffaa00" } });
+        }
       }
     } else {
       // ... or try to find new destination
@@ -248,26 +283,32 @@ function runHarvester(creep: Creep) {
 function runUpgrader(creep: Creep) {
   const state = creep.memory as UpgraderState;
 
-  if (state.isHarvesting && state.sourceId) {
+  if (state.isHarvesting) {
     if (isFull(creep.store)) {
       state.isFull = true;
       state.isHarvesting = false;
       unsubscribeFromSource(creep);
       state.controllerId = findControllerId(creep);
     } else {
-      const source = Game.getObjectById(state.sourceId);
-      if (source) creep.harvest(source);
+      if (state.sourceId) {
+        const source = Game.getObjectById(state.sourceId);
+        if (source) creep.harvest(source);
+      } else {
+        state.sourceId = findEnergySourceId(creep);
+      }
     }
   }
 
-  if (state.controllerId && state.isUnloading) {
+  if (state.isUnloading) {
     if (isEmpty(creep.store)) {
       state.isEmpty = true;
       state.isUnloading = false;
       state.sourceId = findEnergySourceId(creep);
-    } else {
+    } else if (state.controllerId) {
       const controller = Game.getObjectById(state.controllerId);
-      if (controller) creep.transfer(controller, RESOURCE_ENERGY);
+      if (controller) creep.upgradeController(controller);
+    } else {
+      state.controllerId = findControllerId(creep);
     }
   }
 
@@ -296,8 +337,8 @@ function runUpgrader(creep: Creep) {
     const controller = Game.getObjectById(state.controllerId);
     if (!controller) return;
     // if in range, start upgrading controller
-    if (creep.pos.inRangeTo(controller, 1)) {
-      creep.transfer(controller, RESOURCE_ENERGY);
+    if (creep.pos.inRangeTo(controller, 3)) {
+      creep.upgradeController(controller);
       state.isUnloading = true;
       state.isFull = false;
     } else {
@@ -311,21 +352,27 @@ function runBuilder(creep: Creep) {
   const state = creep.memory as BuilderState;
 
   // if building, keep on building
-  if (state.isBuilding && state.constructionId) {
+  if (state.isBuilding) {
     if (isEmpty(creep.store)) {
       state.isEmpty = true;
       state.isBuilding = false;
       state.constructionId = undefined;
       state.sourceId = findEnergySourceId(creep);
-    } else {
+    } else if (state.constructionId) {
       // check if construction site still exists and keep working
       const constructionSite = Game.getObjectById(state.constructionId);
+
       if (constructionSite) {
-        creep.build(constructionSite);
+        const buildResponse = creep.build(constructionSite);
+        if (buildResponse === ERR_NOT_IN_RANGE) {
+          creep.moveTo(constructionSite, { visualizePathStyle: { stroke: "#ffaa00" } });
+        }
       } else {
-        state.isBuilding = false;
+        // state.isBuilding = false;
         state.constructionId = findConstructionSiteId(creep);
       }
+    } else {
+      state.constructionId = findConstructionSiteId(creep);
     }
   }
 
@@ -352,25 +399,29 @@ function runBuilder(creep: Creep) {
       state.isHarvesting = true;
       state.isEmpty = false;
     } else {
-      creep.moveTo(source, { visualizePathStyle: { stroke: "#831" } });
+      creep.moveTo(source, { visualizePathStyle: { stroke: "#1ff" } });
     }
   }
 
   // if full, check if there is anything to build
   if (state.isFull) {
     state.isHarvesting = false;
-    if (!state.constructionId) state.constructionId = findConstructionSiteId(creep);
-    if (!state.constructionId) return;
+    state.constructionId = findConstructionSiteId(creep);
+
+    if (!state.constructionId) {
+      return;
+    }
+
     const constructionSite = Game.getObjectById(state.constructionId);
     if (!constructionSite) return;
     // if in range, start building
-    if (creep.pos.inRangeTo(constructionSite, 1)) {
+    if (creep.pos.inRangeTo(constructionSite, 3)) {
       creep.build(constructionSite);
       state.isBuilding = true;
       state.isFull = false;
     } else {
       // else move closer
-      creep.moveTo(constructionSite, { visualizePathStyle: { stroke: "#831" } });
+      creep.moveTo(constructionSite, { visualizePathStyle: { stroke: "#1ff" } });
     }
   }
 }
@@ -379,10 +430,12 @@ function runBuilder(creep: Creep) {
  * creep util functions
  */
 function generateCreepName(r: creepRole): string {
-  return `${r}-${Game.time}`;
+  const id = Game.time.toString().slice(Game.time.toString().length - 4);
+  return `${r.charAt(0)}-${id}`;
 }
 
 function findSpawnOrExtensionId(creep: Creep): Id<StructureExtension | StructureSpawn> | undefined {
+  // TODO: should prioritize extensions
   const targets = creep.room.find(FIND_STRUCTURES, {
     filter: structure =>
       (structure.structureType === STRUCTURE_EXTENSION || structure.structureType === STRUCTURE_SPAWN) &&
@@ -393,27 +446,24 @@ function findSpawnOrExtensionId(creep: Creep): Id<StructureExtension | Structure
 
 // finds appropriate energy source in the same room creep is in
 function findEnergySourceId(creep: Creep): Id<Source> | undefined {
-  // old:
-  // const room = creep.room.find(FIND_SOURCES_ACTIVE)[0];
-  // return room.id;
-
-  // new:
-  // console.log(JSON.stringify(creep.room.find(FIND_SOURCES_ACTIVE)))
   const sources = creep.room.find(FIND_SOURCES_ACTIVE);
+  // return source with the least active harvesters
   const source = sources.reduce((prev, curr) => {
-    const currNr = creep.room.memory.sources[curr.id].workerCount;
-    const prevNr = creep.room.memory.sources[prev.id].workerCount;
+    const currNr = creep.room.memory.sources[curr.id].harvesters.length;
+    const prevNr = creep.room.memory.sources[prev.id].harvesters.length;
     return currNr < prevNr ? curr : prev;
   });
-  creep.room.memory.sources[source.id].workerCount++;
+  creep.room.memory.sources[source.id].harvesters.push(creep.id);
   return source.id;
 }
 
 function unsubscribeFromSource(creep: Creep): void {
   const memory = creep.memory as HarvesterState | BuilderState | UpgraderState;
   const sources = creep.room.memory.sources;
-  if (memory.sourceId && sources[memory.sourceId].workerCount > 0) {
-    sources[memory.sourceId].workerCount--;
+  if (memory.sourceId) {
+    const registeredSourceHarvesters = sources[memory.sourceId].harvesters;
+    const index = registeredSourceHarvesters.indexOf(creep.id);
+    if (index > -1) registeredSourceHarvesters.splice(index, 1);
   }
 }
 
